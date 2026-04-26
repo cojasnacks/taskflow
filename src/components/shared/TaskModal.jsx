@@ -13,14 +13,13 @@ const PRIORITIES = [
 ]
 
 export default function TaskModal({ projects, task = null, defaultStatus = 'todo', defaultProjectId = null, onSave, onClose, onDelete }) {
-const [form, setForm] = useState({
-  title: task?.title || '',
-  description: task?.description || '',
-  project_id: task?.project_id || defaultProjectId || projects[0]?.id || '',
-  status: task?.status || defaultStatus,
-  priority: task?.priority || 'medium',
-  due_date: task?.due_date || '',
-}),
+  const [form, setForm] = useState({
+    title: task?.title || '',
+    description: task?.description || '',
+    project_id: task?.project_id || defaultProjectId || projects[0]?.id || '',
+    status: task?.status || defaultStatus,
+    priority: task?.priority || 'medium',
+    due_date: task?.due_date || '',
   })
   const [loading, setLoading] = useState(false)
 
@@ -55,11 +54,11 @@ const [form, setForm] = useState({
             <input autoFocus name="title" value={form.title} onChange={handleChange}
               className="input" placeholder="Nom de la tâche..." required />
           </div>
-<div>
-  <label className="block text-xs text-gray-500 mb-1">Description</label>
-  <textarea name="description" value={form.description} onChange={handleChange}
-    className="input resize-none h-16 text-xs" placeholder="Détails optionnels..." />
-</div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Description</label>
+            <textarea name="description" value={form.description} onChange={handleChange}
+              className="input resize-none h-16 text-xs" placeholder="Détails optionnels..." />
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs text-gray-500 mb-1">Projet</label>
@@ -80,32 +79,3 @@ const [form, setForm] = useState({
               <select name="priority" value={form.priority} onChange={handleChange} className="input">
                 {PRIORITIES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
               </select>
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Échéance</label>
-              <input name="due_date" type="date" value={form.due_date} onChange={handleChange} className="input" />
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between pt-2">
-            <div>
-              {task && onDelete && (
-                <button type="button" onClick={handleDelete}
-                  className="text-xs text-red-500 hover:text-red-700 transition-colors">
-                  Supprimer
-                </button>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <button type="button" onClick={onClose} className="btn text-xs">Annuler</button>
-              <button type="submit" disabled={!form.title.trim() || loading || !form.project_id}
-                className="btn btn-primary text-xs disabled:opacity-50">
-                {loading ? '...' : task ? 'Enregistrer' : 'Créer'}
-              </button>
-            </div>
-          </div>
-        </form>
-      </div>
-    </div>
-  )
-}
