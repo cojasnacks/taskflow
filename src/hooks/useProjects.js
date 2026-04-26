@@ -14,12 +14,12 @@ export function useProjects() {
 
   async function fetchProjects() {
     setLoading(true)
-    const { data } = await supabase
-      .from('project_members')
-      .select('project:projects(*)')
-      .eq('user_id', user.id)
+    const { data, error } = await supabase
+      .from('projects')
+      .select('*')
+      .eq('owner_id', user.id)
       .order('created_at', { ascending: true })
-    setProjects(data?.map(d => d.project) ?? [])
+    if (!error) setProjects(data ?? [])
     setLoading(false)
   }
 
@@ -29,13 +29,18 @@ export function useProjects() {
       .insert({ name, color, owner_id: user.id })
       .select()
       .single()
-    if (error || !project) return { error }
+
+    if (error) {
+      console.error('createProject error:', error)
+      return { error }
+    }
 
     await supabase.from('project_members').insert({
       project_id: project.id,
       user_id: user.id,
       role: 'owner',
     })
+
     await fetchProjects()
     return { project }
   }
