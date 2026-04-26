@@ -167,6 +167,9 @@ function TaskCard({ task, onClick, isDragging }) {
     <div onClick={onClick}
       className={`bg-white border rounded-xl p-3 cursor-pointer hover:border-gray-300 transition-all select-none ${isDragging ? 'shadow-lg rotate-1' : 'border-gray-200'}`}>
       <p className="text-xs text-gray-800 leading-relaxed mb-2.5">{task.title}</p>
+{task.description && (
+  <p className="text-[11px] text-gray-400 mb-2 leading-relaxed line-clamp-2">{task.description}</p>
+)}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
           {task.project && (

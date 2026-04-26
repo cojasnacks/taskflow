@@ -13,12 +13,14 @@ const PRIORITIES = [
 ]
 
 export default function TaskModal({ projects, task = null, defaultStatus = 'todo', defaultProjectId = null, onSave, onClose, onDelete }) {
-  const [form, setForm] = useState({
-    title: task?.title || '',
-    project_id: task?.project_id || defaultProjectId || projects[0]?.id || '',
-    status: task?.status || defaultStatus,
-    priority: task?.priority || 'medium',
-    due_date: task?.due_date || '',
+const [form, setForm] = useState({
+  title: task?.title || '',
+  description: task?.description || '',
+  project_id: task?.project_id || defaultProjectId || projects[0]?.id || '',
+  status: task?.status || defaultStatus,
+  priority: task?.priority || 'medium',
+  due_date: task?.due_date || '',
+}),
   })
   const [loading, setLoading] = useState(false)
 
@@ -53,6 +55,11 @@ export default function TaskModal({ projects, task = null, defaultStatus = 'todo
             <input autoFocus name="title" value={form.title} onChange={handleChange}
               className="input" placeholder="Nom de la tâche..." required />
           </div>
+<div>
+  <label className="block text-xs text-gray-500 mb-1">Description</label>
+  <textarea name="description" value={form.description} onChange={handleChange}
+    className="input resize-none h-16 text-xs" placeholder="Détails optionnels..." />
+</div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs text-gray-500 mb-1">Projet</label>
