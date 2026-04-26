@@ -79,3 +79,31 @@ export default function TaskModal({ projects, task = null, defaultStatus = 'todo
               <select name="priority" value={form.priority} onChange={handleChange} className="input">
                 {PRIORITIES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
               </select>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Échéance</label>
+              <input name="due_date" type="date" value={form.due_date} onChange={handleChange} className="input" />
+            </div>
+          </div>
+          <div className="flex items-center justify-between pt-2">
+            <div>
+              {task && onDelete && (
+                <button type="button" onClick={handleDelete}
+                  className="text-xs text-red-500 hover:text-red-700 transition-colors">
+                  Supprimer
+                </button>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <button type="button" onClick={onClose} className="btn text-xs">Annuler</button>
+              <button type="submit" disabled={!form.title.trim() || loading || !form.project_id}
+                className="btn btn-primary text-xs disabled:opacity-50">
+                {loading ? '...' : task ? 'Enregistrer' : 'Créer'}
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
