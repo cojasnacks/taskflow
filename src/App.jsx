@@ -6,6 +6,7 @@ import KanbanPage from './pages/KanbanPage'
 import ListPage from './pages/ListPage'
 import StatsPage from './pages/StatsPage'
 import SettingsPage from './pages/SettingsPage'
+import InvitePage from './pages/InvitePage'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -31,6 +32,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
+          <Route path="/invite/:token" element={<InvitePage />} />
           <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
             <Route index element={<StatsPage />} />
             <Route path="kanban" element={<KanbanPage />} />

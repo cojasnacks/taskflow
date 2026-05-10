@@ -5,11 +5,12 @@ import { useAuth } from './useAuth'
 export function useMembers(projectId) {
   const { user } = useAuth()
   const [members, setMembers] = useState([])
-  const [pending, setPending] = useState([])
+  const [invitations, setInvitations] = useState([])
 
   useEffect(() => {
     if (!projectId) return
     fetchMembers()
+    fetchInvitations()
   }, [projectId])
 
   async function fetchMembers() {
@@ -17,41 +18,62 @@ export function useMembers(projectId) {
       .from('project_members')
       .select('*, profile:profiles(id, full_name, email)')
       .eq('project_id', projectId)
-    const all = data ?? []
-    setMembers(all.filter(m => m.status === 'active'))
-    setPending(all.filter(m => m.status === 'pending'))
+      .eq('status', 'active')
+    setMembers(data ?? [])
+  }
+
+  async function fetchInvitations() {
+    const { data } = await supabase
+      .from('invitations')
+      .select('*')
+      .eq('project_id', projectId)
+      .eq('status', 'pending')
+    setInvitations(data ?? [])
   }
 
   async function inviteMember(email) {
-    // Find user by email
-    const { data: profile } = await supabase
+    // Vérifier si déjà invité
+    const already = invitations.find(i => i.email.toLowerCase() === email.toLowerCase())
+    if (already) return { error: 'Une invitation est déjà en attente pour cet email.' }
+
+    // Vérifier si déjà membre
+    const alreadyMember = members.find(m => m.profile?.email?.toLowerCase() === email.toLowerCase())
+    if (alreadyMember) return { error: 'Cet utilisateur est déjà membre du projet.' }
+
+    const { data: project } = await supabase
+      .from('projects')
+      .select('name')
+      .eq('id', projectId)
+      .single()
+
+    // Créer l'invitation
+    const { data: invitation, error } = await supabase
+      .from('invitations')
+      .insert({ project_id: projectId, email, invited_by: user.id })
+      .select()
+      .single()
+
+    if (error) return { error: error.message }
+
+    // Construire le lien d'invitation
+    const inviteLink = `${window.location.origin}/invite/${invitation.token}`
+
+    // Si l'utilisateur existe déjà → notification
+    const { data: existingProfile } = await supabase
       .from('profiles')
-      .select('id, full_name')
+      .select('id')
       .eq('email', email)
       .single()
 
-    if (!profile) return { error: 'Aucun compte trouvé pour cet email.' }
-
-    const existing = [...members, ...pending].find(m => m.user_id === profile.id)
-    if (existing) return { error: 'Cet utilisateur est déjà membre ou invité.' }
-
-    const { error } = await supabase.from('project_members').insert({
-      project_id: projectId,
-      user_id: profile.id,
-      role: 'member',
-      status: 'pending',
-    })
-
-    if (!error) {
-      // Notification
-      const { data: project } = await supabase.from('projects').select('name').eq('id', projectId).single()
+    if (existingProfile) {
       await supabase.from('notifications').insert({
-        user_id: profile.id,
-        message: `Vous avez été invité au projet "${project?.name}". Acceptez l'invitation dans Paramètres.`,
+        user_id: existingProfile.id,
+        message: `Vous avez été invité au projet "${project?.name}". Cliquez ici pour accepter : ${inviteLink}`,
       })
-      await fetchMembers()
     }
-    return { error: error?.message }
+
+    await fetchInvitations()
+    return { error: null, inviteLink }
   }
 
   async function removeMember(memberId) {
@@ -59,19 +81,14 @@ export function useMembers(projectId) {
     await fetchMembers()
   }
 
-  async function acceptInvitation(projectId) {
-    await supabase
-      .from('project_members')
-      .update({ status: 'active' })
-      .eq('project_id', projectId)
-      .eq('user_id', user.id)
-    await fetchMembers()
+  async function cancelInvitation(invitationId) {
+    await supabase.from('invitations').delete().eq('id', invitationId)
+    await fetchInvitations()
   }
 
-  return { members, pending, inviteMember, removeMember, acceptInvitation, refetch: fetchMembers }
+  return { members, invitations, inviteMember, removeMember, cancelInvitation, refetch: fetchMembers }
 }
 
-// Hook pour les invitations en attente de l'utilisateur connecté
 export function usePendingInvitations() {
   const { user } = useAuth()
   const [invitations, setInvitations] = useState([])
@@ -108,5 +125,5 @@ export function usePendingInvitations() {
     await fetchInvitations()
   }
 
-  return { invitations, accept, decline, refetch: fetchInvitations }
+  return { invitations, accept, decline }
 }
