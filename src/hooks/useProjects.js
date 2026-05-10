@@ -14,12 +14,13 @@ export function useProjects() {
 
   async function fetchProjects() {
     setLoading(true)
+    // Récupérer tous les projets où l'user est membre actif (owner OU invité accepté)
     const { data } = await supabase
-      .from('projects')
-      .select('*')
-      .eq('owner_id', user.id)
-      .order('created_at', { ascending: true })
-    setProjects(data ?? [])
+      .from('project_members')
+      .select('project:projects(*)')
+      .eq('user_id', user.id)
+      .eq('status', 'active')
+    setProjects(data?.map(d => d.project).filter(Boolean) ?? [])
     setLoading(false)
   }
 
