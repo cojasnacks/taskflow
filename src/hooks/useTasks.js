@@ -23,8 +23,12 @@ export function useTasks(projectId = null) {
     setLoading(true)
     let query = supabase
       .from('tasks')
-      .select('*, project:projects(id,name,color), assignee:profiles!tasks_assignee_id_fkey(id,full_name,avatar_url)')
-      .order('position', { ascending: true })
+      .select(`
+        *,
+        project:projects(id, name, color),
+        assignee:profiles!tasks_assignee_id_fkey(id, full_name, email),
+        task_labels(label:labels(id, name, color))
+      `)
       .order('created_at', { ascending: false })
 
     if (projectId) query = query.eq('project_id', projectId)
@@ -34,18 +38,37 @@ export function useTasks(projectId = null) {
     setLoading(false)
   }
 
-  async function createTask({ title, project_id, status = 'todo', priority = 'medium', due_date = null, assignee_id = null }) {
+  async function createTask({ title, description, project_id, status = 'todo', priority = 'medium', due_date = null, assignee_id = null, label_ids = [] }) {
     const { data, error } = await supabase
       .from('tasks')
-      .insert({ title, project_id, status, priority, due_date, assignee_id, created_by: user.id })
+      .insert({ title, description, project_id, status, priority, due_date, assignee_id, created_by: user.id })
       .select()
       .single()
-    if (!error) await fetchTasks()
+
+    if (error) return { data, error }
+
+    // Insert labels
+    if (label_ids.length > 0) {
+      await supabase.from('task_labels').insert(label_ids.map(lid => ({ task_id: data.id, label_id: lid })))
+    }
+
+    await fetchTasks()
     return { data, error }
   }
 
   async function updateTask(id, updates) {
-    const { error } = await supabase.from('tasks').update(updates).eq('id', id)
+    const { label_ids, ...taskUpdates } = updates
+
+    const { error } = await supabase.from('tasks').update(taskUpdates).eq('id', id)
+
+    // Update labels if provided
+    if (label_ids !== undefined) {
+      await supabase.from('task_labels').delete().eq('task_id', id)
+      if (label_ids.length > 0) {
+        await supabase.from('task_labels').insert(label_ids.map(lid => ({ task_id: id, label_id: lid })))
+      }
+    }
+
     if (!error) await fetchTasks()
     return { error }
   }

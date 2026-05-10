@@ -1,86 +1,34 @@
 import { useState, useEffect } from 'react'
 import { useProjects } from '../hooks/useProjects'
 import { useAuth } from '../hooks/useAuth'
-import { supabase } from '../lib/supabase'
+import { useMembers, usePendingInvitations } from '../hooks/useMembers'
 
 export default function SettingsPage() {
   const { user, profile, signOut } = useAuth()
   const { projects } = useProjects()
   const [selectedProject, setSelectedProject] = useState('')
+  const { members, pending, inviteMember, removeMember } = useMembers(selectedProject)
+  const { invitations, accept, decline } = usePendingInvitations()
   const [inviteEmail, setInviteEmail] = useState('')
-  const [members, setMembers] = useState([])
-  const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState('')
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     if (projects.length > 0 && !selectedProject) setSelectedProject(projects[0].id)
   }, [projects])
-
-  useEffect(() => {
-    if (selectedProject) fetchMembers()
-  }, [selectedProject])
-
-  async function fetchMembers() {
-    const { data } = await supabase
-      .from('project_members')
-      .select('*, profile:profiles(full_name, email, avatar_url)')
-      .eq('project_id', selectedProject)
-    setMembers(data ?? [])
-  }
 
   async function handleInvite(e) {
     e.preventDefault()
     if (!inviteEmail.trim() || !selectedProject) return
     setLoading(true)
     setMsg('')
-    // Find user by email
-    const { data: targetProfile } = await supabase
-      .from('profiles')
-      .select('id, full_name')
-      .eq('email', inviteEmail.trim())
-      .single()
-
-    if (!targetProfile) {
-      setMsg('Aucun compte trouvé pour cet email.')
-      setLoading(false)
-      return
-    }
-
-    // Check not already member
-    const existing = members.find(m => m.user_id === targetProfile.id)
-    if (existing) {
-      setMsg('Cet utilisateur est déjà membre du projet.')
-      setLoading(false)
-      return
-    }
-
-    const { error } = await supabase.from('project_members').insert({
-      project_id: selectedProject,
-      user_id: targetProfile.id,
-      role: 'member',
-    })
-
-    if (error) {
-      setMsg('Erreur lors de l\'invitation.')
-    } else {
-      // Send notification
-      await supabase.from('notifications').insert({
-        user_id: targetProfile.id,
-        message: `Vous avez été ajouté au projet "${projects.find(p => p.id === selectedProject)?.name}".`,
-      })
-      setMsg(`${targetProfile.full_name} ajouté avec succès !`)
-      setInviteEmail('')
-      fetchMembers()
-    }
+    const { error } = await inviteMember(inviteEmail.trim())
+    setMsg(error || `Invitation envoyée !`)
+    if (!error) setInviteEmail('')
     setLoading(false)
   }
 
-  async function removeMember(memberId, userId) {
-    if (userId === user.id) return
-    if (!confirm('Retirer ce membre ?')) return
-    await supabase.from('project_members').delete().eq('id', memberId)
-    fetchMembers()
-  }
+  const initials = (name) => name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '??'
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -88,13 +36,33 @@ export default function SettingsPage() {
         <h1 className="text-sm font-semibold text-gray-900">Équipe & Paramètres</h1>
       </header>
 
-      <div className="flex-1 overflow-y-auto p-5 max-w-2xl space-y-6">
-        {/* Profile */}
+      <div className="flex-1 overflow-y-auto p-5 max-w-2xl space-y-5">
+
+        {/* Invitations en attente pour MOI */}
+        {invitations.length > 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+            <h2 className="text-xs font-semibold text-amber-800 mb-3">Invitations en attente</h2>
+            <div className="space-y-2">
+              {invitations.map(inv => (
+                <div key={inv.id} className="flex items-center gap-3">
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: inv.project?.color }} />
+                  <span className="text-sm text-gray-800 flex-1">{inv.project?.name}</span>
+                  <button onClick={() => accept(inv.project_id)}
+                    className="btn btn-primary text-xs py-1">Accepter</button>
+                  <button onClick={() => decline(inv.project_id)}
+                    className="btn text-xs py-1 text-red-500 border-red-200 hover:bg-red-50">Refuser</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Mon profil */}
         <div className="bg-white border border-gray-100 rounded-xl p-5">
           <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">Mon profil</h2>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-accent-light flex items-center justify-center text-sm font-medium text-accent">
-              {profile?.full_name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '??'}
+              {initials(profile?.full_name)}
             </div>
             <div>
               <p className="text-sm font-medium text-gray-900">{profile?.full_name || '—'}</p>
@@ -106,7 +74,7 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Team */}
+        {/* Gestion équipe */}
         <div className="bg-white border border-gray-100 rounded-xl p-5">
           <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">Gestion de l'équipe</h2>
 
@@ -117,29 +85,55 @@ export default function SettingsPage() {
             </select>
           </div>
 
-          {/* Members list */}
+          {/* Membres actifs */}
           {members.length > 0 && (
-            <div className="mb-4 space-y-2">
-              {members.map(m => (
-                <div key={m.id} className="flex items-center gap-3 py-2 border-b border-gray-50">
-                  <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-xs font-medium text-gray-500">
-                    {m.profile?.full_name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0,2) || '??'}
+            <div className="mb-4">
+              <p className="text-xs text-gray-400 mb-2">Membres actifs</p>
+              <div className="space-y-2">
+                {members.map(m => (
+                  <div key={m.id} className="flex items-center gap-3 py-2 border-b border-gray-50">
+                    <div className="w-7 h-7 rounded-full bg-accent-light flex items-center justify-center text-xs font-medium text-accent">
+                      {initials(m.profile?.full_name)}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs font-medium text-gray-800">{m.profile?.full_name}</p>
+                      <p className="text-[10px] text-gray-400">{m.profile?.email}</p>
+                    </div>
+                    <span className={`tag text-[10px] ${m.role === 'owner' ? 'bg-accent-light text-accent' : 'bg-gray-100 text-gray-500'}`}>{m.role}</span>
+                    {m.user_id !== user.id && (
+                      <button onClick={() => removeMember(m.id)}
+                        className="text-[10px] text-gray-400 hover:text-red-500 transition-colors">Retirer</button>
+                    )}
                   </div>
-                  <div className="flex-1">
-                    <p className="text-xs font-medium text-gray-800">{m.profile?.full_name}</p>
-                    <p className="text-[10px] text-gray-400">{m.profile?.email}</p>
-                  </div>
-                  <span className={`tag text-[10px] ${m.role === 'owner' ? 'bg-accent-light text-accent' : 'bg-gray-100 text-gray-500'}`}>{m.role}</span>
-                  {m.user_id !== user.id && (
-                    <button onClick={() => removeMember(m.id, m.user_id)}
-                      className="text-[10px] text-gray-400 hover:text-red-500 transition-colors">Retirer</button>
-                  )}
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           )}
 
-          {/* Invite form */}
+          {/* Invitations en attente (côté owner) */}
+          {pending.length > 0 && (
+            <div className="mb-4">
+              <p className="text-xs text-gray-400 mb-2">En attente de réponse</p>
+              <div className="space-y-2">
+                {pending.map(m => (
+                  <div key={m.id} className="flex items-center gap-3 py-2 border-b border-gray-50">
+                    <div className="w-7 h-7 rounded-full bg-amber-100 flex items-center justify-center text-xs font-medium text-amber-700">
+                      {initials(m.profile?.full_name)}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs font-medium text-gray-800">{m.profile?.full_name}</p>
+                      <p className="text-[10px] text-gray-400">{m.profile?.email}</p>
+                    </div>
+                    <span className="tag text-[10px] bg-amber-50 text-amber-700">En attente</span>
+                    <button onClick={() => removeMember(m.id)}
+                      className="text-[10px] text-gray-400 hover:text-red-500 transition-colors">Annuler</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Inviter */}
           <form onSubmit={handleInvite} className="flex gap-2">
             <input value={inviteEmail} onChange={e => setInviteEmail(e.target.value)}
               type="email" placeholder="email@exemple.com"
@@ -149,7 +143,7 @@ export default function SettingsPage() {
             </button>
           </form>
           {msg && (
-            <p className={`text-xs mt-2 ${msg.includes('succès') ? 'text-green-600' : 'text-red-500'}`}>{msg}</p>
+            <p className={`text-xs mt-2 ${msg.includes('envoyée') ? 'text-green-600' : 'text-red-500'}`}>{msg}</p>
           )}
         </div>
       </div>

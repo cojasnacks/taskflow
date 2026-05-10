@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTasks } from '../hooks/useTasks'
 import { useProjects } from '../hooks/useProjects'
-import TaskModal from "../components/shared/TaskModal";
+import TaskModal from '../components/shared/TaskModal'
 import { format, isPast } from 'date-fns'
 import { fr } from 'date-fns/locale'
 
