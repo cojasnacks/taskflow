@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
-import { supabase } from '../../lib/supabase'
+import { useState } from 'react'
 import { useLabels } from '../../hooks/useLabels'
+import { supabase } from '../../lib/supabase'
+import { useEffect } from 'react'
 
 const STATUSES = [
   { value: 'todo', label: 'À faire' },
@@ -13,6 +14,7 @@ const PRIORITIES = [
   { value: 'medium', label: 'Moyenne' },
   { value: 'high', label: 'Haute' },
 ]
+const LABEL_COLORS = ['#5344B7','#1D9E75','#BA7517','#D85A30','#D4537E','#378ADD','#888780']
 
 export default function TaskModal({ projects, task = null, defaultStatus = 'todo', defaultProjectId = null, onSave, onClose, onDelete }) {
   const [form, setForm] = useState({
@@ -23,11 +25,11 @@ export default function TaskModal({ projects, task = null, defaultStatus = 'todo
     priority: task?.priority || 'medium',
     due_date: task?.due_date || '',
     assignee_id: task?.assignee_id || '',
-    label_ids: task?.task_labels?.map(tl => tl.label.id) || [],
+    label_ids: task?.task_labels?.map(tl => tl.label?.id).filter(Boolean) || [],
   })
   const [loading, setLoading] = useState(false)
   const [members, setMembers] = useState([])
-  const { labels, createLabel } = useLabels(form.project_id)
+  const { labels, createLabel } = useLabels()
   const [newLabel, setNewLabel] = useState('')
   const [newLabelColor, setNewLabelColor] = useState('#5344B7')
   const [showLabelForm, setShowLabelForm] = useState(false)
@@ -70,11 +72,7 @@ export default function TaskModal({ projects, task = null, defaultStatus = 'todo
     e.preventDefault()
     if (!form.title.trim()) return
     setLoading(true)
-    await onSave({
-      ...form,
-      title: form.title.trim(),
-      assignee_id: form.assignee_id || null,
-    })
+    await onSave({ ...form, title: form.title.trim(), assignee_id: form.assignee_id || null })
     setLoading(false)
     onClose()
   }
@@ -86,8 +84,6 @@ export default function TaskModal({ projects, task = null, defaultStatus = 'todo
     onClose()
   }
 
-  const LABEL_COLORS = ['#5344B7','#1D9E75','#BA7517','#D85A30','#D4537E','#378ADD']
-
   return (
     <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50"
       onClick={e => e.target === e.currentTarget && onClose()}>
@@ -96,15 +92,12 @@ export default function TaskModal({ projects, task = null, defaultStatus = 'todo
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
             <label className="block text-xs text-gray-500 mb-1">Titre</label>
-            <input autoFocus name="title" value={form.title} onChange={handleChange}
-              className="input" placeholder="Nom de la tâche..." required />
+            <input autoFocus name="title" value={form.title} onChange={handleChange} className="input" placeholder="Nom de la tâche..." required />
           </div>
           <div>
             <label className="block text-xs text-gray-500 mb-1">Description</label>
-            <textarea name="description" value={form.description} onChange={handleChange}
-              className="input resize-none h-16 text-xs" placeholder="Détails optionnels..." />
+            <textarea name="description" value={form.description} onChange={handleChange} className="input resize-none h-16 text-xs" placeholder="Détails optionnels..." />
           </div>
-
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs text-gray-500 mb-1">Projet</label>
@@ -122,7 +115,6 @@ export default function TaskModal({ projects, task = null, defaultStatus = 'todo
               </select>
             </div>
           </div>
-
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs text-gray-500 mb-1">Statut</label>
@@ -137,27 +129,25 @@ export default function TaskModal({ projects, task = null, defaultStatus = 'todo
               </select>
             </div>
           </div>
-
           <div>
             <label className="block text-xs text-gray-500 mb-1">Échéance</label>
             <input name="due_date" type="date" value={form.due_date} onChange={handleChange} className="input" />
           </div>
 
-          {/* Labels */}
+          {/* Labels globaux */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="block text-xs text-gray-500">Catégories</label>
-              <button type="button" onClick={() => setShowLabelForm(v => !v)}
-                className="text-xs text-accent hover:underline">+ Nouvelle</button>
+              <button type="button" onClick={() => setShowLabelForm(v => !v)} className="text-xs text-accent hover:underline">+ Nouvelle</button>
             </div>
             {showLabelForm && (
-              <div className="flex gap-2 mb-2">
+              <div className="flex gap-2 mb-2 items-center">
                 <input value={newLabel} onChange={e => setNewLabel(e.target.value)}
-                  className="input flex-1 text-xs" placeholder="Nom du label..." />
-                <div className="flex gap-1 items-center">
+                  className="input flex-1 text-xs" placeholder="Nom..." />
+                <div className="flex gap-1">
                   {LABEL_COLORS.map(c => (
                     <button key={c} type="button" onClick={() => setNewLabelColor(c)}
-                      className="w-4 h-4 rounded-full transition-transform hover:scale-110"
+                      className="w-4 h-4 rounded-full transition-transform hover:scale-110 shrink-0"
                       style={{ background: c, outline: newLabelColor === c ? `2px solid ${c}` : 'none', outlineOffset: 2 }} />
                   ))}
                 </div>
@@ -176,19 +166,14 @@ export default function TaskModal({ projects, task = null, defaultStatus = 'todo
                   {l.name}
                 </button>
               ))}
-              {labels.length === 0 && (
-                <p className="text-xs text-gray-400">Aucune catégorie — crée-en une ci-dessus</p>
-              )}
+              {labels.length === 0 && <p className="text-xs text-gray-400">Aucune catégorie — crée-en une ci-dessus</p>}
             </div>
           </div>
 
           <div className="flex items-center justify-between pt-2">
             <div>
               {task && onDelete && (
-                <button type="button" onClick={handleDelete}
-                  className="text-xs text-red-500 hover:text-red-700 transition-colors">
-                  Supprimer
-                </button>
+                <button type="button" onClick={handleDelete} className="text-xs text-red-500 hover:text-red-700 transition-colors">Supprimer</button>
               )}
             </div>
             <div className="flex gap-2">
