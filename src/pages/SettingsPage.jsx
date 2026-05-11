@@ -14,7 +14,7 @@ export default function SettingsPage() {
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteProjects, setInviteProjects] = useState([])
   const [inviteMsg, setInviteMsg] = useState({ text: '', ok: false })
-  const [inviteLinks, setInviteLinks] = useState([])
+  const [inviteLink, setInviteLink] = useState('')
   const [inviteLoading, setInviteLoading] = useState(false)
   const [editingProject, setEditingProject] = useState(null)
   const [renameLoading, setRenameLoading] = useState(false)
@@ -59,27 +59,31 @@ export default function SettingsPage() {
     if (!inviteEmail.trim() || inviteProjects.length === 0) return
     setInviteLoading(true)
     setInviteMsg({ text: '', ok: false })
-    setInviteLinks([])
-    const links = []
-    for (const projectId of inviteProjects) {
-      const { data: existing } = await supabase.from('invitations').select('id').eq('project_id', projectId).eq('email', inviteEmail.trim()).eq('status', 'pending').single()
-      if (existing) continue
-      const { data: invitation } = await supabase.from('invitations').insert({ project_id: projectId, email: inviteEmail.trim(), invited_by: user.id }).select().single()
-      if (invitation) {
-        const project = projects.find(p => p.id === projectId)
-        links.push({ project: project?.name, link: `${window.location.origin}/invite/${invitation.token}` })
-        const { data: ep } = await supabase.from('profiles').select('id').eq('email', inviteEmail.trim()).single()
-        if (ep) await supabase.from('notifications').insert({ user_id: ep.id, message: `Vous avez été invité au projet "${project?.name}".` })
-      }
+    setInviteLink('')
+
+    // 1 seule invitation avec la liste des projets en metadata
+    const { data: invitation, error } = await supabase
+      .from('invitations')
+      .insert({
+        project_id: inviteProjects[0], // projet principal
+        email: inviteEmail.trim(),
+        invited_by: user.id,
+        meta: { project_ids: inviteProjects } // tous les projets
+      })
+      .select()
+      .single()
+
+    if (error || !invitation) {
+      setInviteMsg({ text: 'Erreur lors de la création de l\'invitation.', ok: false })
+      setInviteLoading(false)
+      return
     }
-    if (links.length > 0) {
-      setInviteLinks(links)
-      setInviteMsg({ text: `${links.length} invitation(s) créée(s) !`, ok: true })
-      setInviteEmail('')
-      setInviteProjects([])
-    } else {
-      setInviteMsg({ text: 'Invitations déjà envoyées pour ces projets.', ok: false })
-    }
+
+    const link = `${window.location.origin}/invite/${invitation.token}`
+    setInviteLink(link)
+    setInviteMsg({ text: 'Invitation créée — envoie le lien ci-dessous !', ok: true })
+    setInviteEmail('')
+    setInviteProjects([])
     setInviteLoading(false)
   }
 
@@ -147,21 +151,21 @@ export default function SettingsPage() {
                   {inviteProjects.length === 0 && <p className="text-[10px] text-gray-400 mt-1">Sélectionne au moins un projet</p>}
                 </div>
                 <button type="submit" disabled={inviteLoading || inviteProjects.length === 0} className="btn btn-primary text-xs disabled:opacity-50">
-                  {inviteLoading ? '...' : 'Envoyer les invitations'}
+                  {inviteLoading ? '...' : 'Générer le lien d\'invitation'}
                 </button>
               </form>
+
               {inviteMsg.text && <p className={`text-xs mt-3 ${inviteMsg.ok ? 'text-green-600' : 'text-red-500'}`}>{inviteMsg.text}</p>}
-              {inviteLinks.length > 0 && (
-                <div className="mt-3 space-y-2">
-                  {inviteLinks.map((l, i) => (
-                    <div key={i} className="p-3 bg-accent-light rounded-lg">
-                      <p className="text-xs text-accent font-medium mb-1">Lien — {l.project}</p>
-                      <div className="flex gap-2">
-                        <input readOnly value={l.link} className="input text-xs flex-1 bg-white text-gray-600" />
-                        <button onClick={() => navigator.clipboard.writeText(l.link)} className="btn btn-primary text-xs whitespace-nowrap">Copier</button>
-                      </div>
-                    </div>
-                  ))}
+
+              {inviteLink && (
+                <div className="mt-3 p-3 bg-accent-light rounded-lg">
+                  <p className="text-xs text-accent font-medium mb-2">Lien unique à envoyer :</p>
+                  <div className="flex gap-2">
+                    <input readOnly value={inviteLink} className="input text-xs flex-1 bg-white text-gray-600" />
+                    <button onClick={() => { navigator.clipboard.writeText(inviteLink); setInviteMsg({ text: 'Lien copié !', ok: true }) }}
+                      className="btn btn-primary text-xs whitespace-nowrap">Copier</button>
+                  </div>
+                  <p className="text-[10px] text-accent/70 mt-1">L'invité crée son compte via ce lien et accède directement aux projets sélectionnés.</p>
                 </div>
               )}
             </div>

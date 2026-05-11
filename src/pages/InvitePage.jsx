@@ -8,19 +8,15 @@ export default function InvitePage() {
   const { user, loading: authLoading } = useAuth()
   const navigate = useNavigate()
   const [invitation, setInvitation] = useState(null)
-  const [status, setStatus] = useState('loading') // loading | ready | accepted | error
-  const [authMode, setAuthMode] = useState('login')
+  const [status, setStatus] = useState('loading')
+  const [authMode, setAuthMode] = useState('signup')
   const [form, setForm] = useState({ email: '', password: '', fullName: '' })
   const [authError, setAuthError] = useState('')
 
-  useEffect(() => {
-    fetchInvitation()
-  }, [token])
+  useEffect(() => { fetchInvitation() }, [token])
 
   useEffect(() => {
-    if (!authLoading && user && invitation) {
-      handleAccept()
-    }
+    if (!authLoading && user && invitation) handleAccept()
   }, [user, authLoading, invitation])
 
   async function fetchInvitation() {
@@ -30,11 +26,7 @@ export default function InvitePage() {
       .eq('token', token)
       .eq('status', 'pending')
       .single()
-
-    if (error || !data) {
-      setStatus('error')
-      return
-    }
+    if (error || !data) { setStatus('error'); return }
     setInvitation(data)
     setForm(f => ({ ...f, email: data.email }))
     setStatus('ready')
@@ -42,25 +34,27 @@ export default function InvitePage() {
 
   async function handleAccept() {
     if (!invitation) return
+    // Récupérer tous les project_ids depuis meta ou project_id principal
+    const projectIds = invitation.meta?.project_ids || [invitation.project_id]
 
-    // Vérifier si déjà membre
-    const { data: existing } = await supabase
-      .from('project_members')
-      .select('id')
-      .eq('project_id', invitation.project_id)
-      .eq('user_id', user.id)
-      .single()
+    for (const projectId of projectIds) {
+      const { data: existing } = await supabase
+        .from('project_members')
+        .select('id')
+        .eq('project_id', projectId)
+        .eq('user_id', user.id)
+        .single()
 
-    if (!existing) {
-      await supabase.from('project_members').insert({
-        project_id: invitation.project_id,
-        user_id: user.id,
-        role: 'member',
-        status: 'active',
-      })
+      if (!existing) {
+        await supabase.from('project_members').insert({
+          project_id: projectId,
+          user_id: user.id,
+          role: 'member',
+          status: 'active',
+        })
+      }
     }
 
-    // Marquer l'invitation comme acceptée
     await supabase.from('invitations').update({ status: 'accepted' }).eq('token', token)
     setStatus('accepted')
     setTimeout(() => navigate('/'), 2000)
@@ -79,8 +73,13 @@ export default function InvitePage() {
         options: { data: { full_name: form.fullName } },
       })
       if (error) setAuthError(error.message)
+      else setAuthMode('login')
     }
   }
+
+  const projectNames = invitation?.meta?.project_ids
+    ? invitation.meta.project_ids.length + ' projet(s)'
+    : invitation?.project?.name
 
   if (status === 'loading') return <PageShell>Chargement...</PageShell>
 
@@ -101,7 +100,7 @@ export default function InvitePage() {
             <path d="M4 10l4 4 8-8" stroke="#1D9E75" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </div>
-        <p className="text-sm font-medium text-gray-900 mb-1">Invitation acceptée !</p>
+        <p className="text-sm font-medium text-gray-900 mb-1">Bienvenue sur TaskFlow !</p>
         <p className="text-xs text-gray-400">Redirection en cours...</p>
       </div>
     </PageShell>
@@ -110,56 +109,45 @@ export default function InvitePage() {
   return (
     <PageShell>
       <div className="w-full max-w-sm">
-        {/* Projet */}
-        <div className="flex items-center gap-2 justify-center mb-6">
-          <span className="w-3 h-3 rounded-full" style={{ background: invitation.project?.color }} />
-          <span className="text-sm font-medium text-gray-700">
-            Invitation au projet <strong>{invitation.project?.name}</strong>
-          </span>
+        <div className="text-center mb-6">
+          <p className="text-sm text-gray-600">Tu as été invité à rejoindre</p>
+          <p className="text-base font-semibold text-gray-900 mt-1">{projectNames}</p>
         </div>
 
-        {!user ? (
-          <div className="card p-6 shadow-sm">
-            <p className="text-xs text-gray-500 text-center mb-4">
-              {authMode === 'login' ? 'Connecte-toi pour accepter l\'invitation' : 'Crée ton compte pour rejoindre le projet'}
-            </p>
-            <form onSubmit={handleAuth} className="space-y-3">
-              {authMode === 'signup' && (
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Nom complet</label>
-                  <input value={form.fullName} onChange={e => setForm(f => ({ ...f, fullName: e.target.value }))}
-                    className="input" placeholder="Ton nom" required />
-                </div>
-              )}
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Email</label>
-                <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                  className="input" required />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Mot de passe</label>
-                <input type="password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-                  className="input" placeholder="••••••••" required minLength={6} />
-              </div>
-              {authError && <p className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-lg">{authError}</p>}
-              <button type="submit" className="w-full btn btn-primary justify-center py-2 text-sm">
-                {authMode === 'login' ? 'Se connecter & rejoindre' : 'Créer mon compte & rejoindre'}
+        <div className="card p-6 shadow-sm">
+          <div className="flex gap-2 bg-gray-100 rounded-lg p-1 mb-4">
+            {[{ id: 'signup', label: 'Créer un compte' }, { id: 'login', label: 'Se connecter' }].map(m => (
+              <button key={m.id} onClick={() => setAuthMode(m.id)}
+                className={`flex-1 py-1 rounded-md text-xs transition-colors ${authMode === m.id ? 'bg-white text-gray-900 shadow-sm font-medium' : 'text-gray-500'}`}>
+                {m.label}
               </button>
-            </form>
-            <p className="text-center text-xs text-gray-400 mt-3">
-              {authMode === 'login' ? 'Pas de compte ? ' : 'Déjà un compte ? '}
-              <button onClick={() => setAuthMode(m => m === 'login' ? 'signup' : 'login')}
-                className="text-accent hover:underline">
-                {authMode === 'login' ? 'Inscription' : 'Connexion'}
-              </button>
-            </p>
+            ))}
           </div>
-        ) : (
-          <div className="card p-6 shadow-sm text-center">
-            <p className="text-sm text-gray-600 mb-4">Accepter l'invitation au projet <strong>{invitation.project?.name}</strong> ?</p>
-            <button onClick={handleAccept} className="btn btn-primary w-full justify-center">Accepter</button>
-          </div>
-        )}
+
+          <form onSubmit={handleAuth} className="space-y-3">
+            {authMode === 'signup' && (
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Nom complet</label>
+                <input value={form.fullName} onChange={e => setForm(f => ({ ...f, fullName: e.target.value }))}
+                  className="input" placeholder="Ton nom" required />
+              </div>
+            )}
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Email</label>
+              <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                className="input" required />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Mot de passe</label>
+              <input type="password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                className="input" placeholder="••••••••" required minLength={6} />
+            </div>
+            {authError && <p className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-lg">{authError}</p>}
+            <button type="submit" className="w-full btn btn-primary justify-center py-2 text-sm">
+              {authMode === 'signup' ? 'Créer mon compte & rejoindre' : 'Se connecter & rejoindre'}
+            </button>
+          </form>
+        </div>
       </div>
     </PageShell>
   )
