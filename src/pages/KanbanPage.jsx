@@ -27,6 +27,7 @@ export default function KanbanPage() {
   const [showModal, setShowModal] = useState(false)
   const [editTask, setEditTask] = useState(null)
   const [defaultStatus, setDefaultStatus] = useState('todo')
+  const [moveModal, setMoveModal] = useState(null)
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
@@ -62,6 +63,11 @@ export default function KanbanPage() {
     else await createTask(data)
   }
 
+  async function handleMoveProject(task, newProjectId) {
+    await updateTask(task.id, { project_id: newProjectId })
+    setMoveModal(null)
+  }
+
   const activeTask = activeId ? tasks.find(t => t.id === activeId) : null
 
   if (loading) return (
@@ -87,7 +93,9 @@ export default function KanbanPage() {
               const colTasks = getTasksByStatus(col.id)
               return (
                 <KanbanColumn key={col.id} column={col} tasks={colTasks}
-                  onCardClick={openEdit} onAddClick={() => openCreate(col.id)} />
+                  onCardClick={openEdit}
+                  onAddClick={() => openCreate(col.id)}
+                  onMoveClick={(task) => setMoveModal(task)} />
               )
             })}
           </div>
@@ -108,11 +116,53 @@ export default function KanbanPage() {
           onDelete={editTask ? deleteTask : null}
         />
       )}
+
+      {moveModal && (
+        <MoveProjectModal
+          task={moveModal}
+          projects={projects}
+          onMove={handleMoveProject}
+          onClose={() => setMoveModal(null)}
+        />
+      )}
     </div>
   )
 }
 
-function KanbanColumn({ column, tasks, onCardClick, onAddClick }) {
+function MoveProjectModal({ task, projects, onMove, onClose }) {
+  const otherProjects = projects.filter(p => p.id !== task.project_id)
+
+  return (
+    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50"
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white rounded-2xl shadow-xl p-5 w-72 border border-gray-100">
+        <h2 className="text-sm font-semibold text-gray-900 mb-1">Déplacer vers un projet</h2>
+        <p className="text-xs text-gray-400 mb-4 truncate">"{task.title}"</p>
+
+        {otherProjects.length === 0 ? (
+          <p className="text-xs text-gray-400 text-center py-4">Aucun autre projet disponible</p>
+        ) : (
+          <div className="space-y-1.5">
+            {otherProjects.map(p => (
+              <button key={p.id} onClick={() => onMove(task, p.id)}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-gray-100 hover:border-gray-200 hover:bg-gray-50 transition-all text-left">
+                <span className="w-3 h-3 rounded-full shrink-0" style={{ background: p.color }} />
+                <span className="text-sm text-gray-700">{p.name}</span>
+                <svg className="ml-auto text-gray-300" width="14" height="14" viewBox="0 0 16 16" fill="none">
+                  <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+            ))}
+          </div>
+        )}
+
+        <button onClick={onClose} className="w-full mt-3 btn text-xs justify-center">Annuler</button>
+      </div>
+    </div>
+  )
+}
+
+function KanbanColumn({ column, tasks, onCardClick, onAddClick, onMoveClick }) {
   const { setNodeRef } = useSortable({ id: column.id, data: { column: column.id }, disabled: true })
   return (
     <div ref={setNodeRef} className="w-56 shrink-0 flex flex-col">
@@ -124,7 +174,7 @@ function KanbanColumn({ column, tasks, onCardClick, onAddClick }) {
       <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
         <div className="flex flex-col gap-2 flex-1 overflow-y-auto pb-2 min-h-16">
           {tasks.map(task => (
-            <SortableCard key={task.id} task={task} onClick={() => onCardClick(task)} />
+            <SortableCard key={task.id} task={task} onClick={() => onCardClick(task)} onMoveClick={() => onMoveClick(task)} />
           ))}
         </div>
       </SortableContext>
@@ -136,32 +186,50 @@ function KanbanColumn({ column, tasks, onCardClick, onAddClick }) {
   )
 }
 
-function SortableCard({ task, onClick }) {
+function SortableCard({ task, onClick, onMoveClick }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id })
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <TaskCard task={task} onClick={onClick} />
+      <TaskCard task={task} onClick={onClick} onMoveClick={onMoveClick} />
     </div>
   )
 }
 
-function TaskCard({ task, onClick, isDragging }) {
+function TaskCard({ task, onClick, onMoveClick, isDragging }) {
   const isLate = task.due_date && isPast(new Date(task.due_date)) && task.status !== 'done'
   const labels = task.task_labels?.map(tl => tl.label).filter(Boolean) ?? []
+  const [showActions, setShowActions] = useState(false)
   const initials = task.assignee?.full_name
     ? task.assignee.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
     : null
 
   return (
-    <div onClick={onClick}
-      className={`bg-white border rounded-xl p-3 cursor-pointer hover:border-gray-300 transition-all select-none ${isDragging ? 'shadow-lg rotate-1' : 'border-gray-200'}`}>
-      <p className="text-xs text-gray-800 leading-relaxed mb-1">{task.title}</p>
+    <div
+      className={`bg-white border rounded-xl p-3 cursor-pointer hover:border-gray-300 transition-all select-none ${isDragging ? 'shadow-lg rotate-1' : 'border-gray-200'}`}
+      onClick={onClick}
+      onMouseEnter={() => setShowActions(true)}
+      onMouseLeave={() => setShowActions(false)}
+    >
+      <div className="flex items-start justify-between gap-1 mb-1">
+        <p className="text-xs text-gray-800 leading-relaxed flex-1">{task.title}</p>
+        {showActions && !isDragging && (
+          <button
+            onClick={e => { e.stopPropagation(); onMoveClick() }}
+            className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-gray-100 hover:bg-accent-light hover:text-accent text-gray-400 text-[10px] font-medium transition-colors whitespace-nowrap"
+          >
+            <svg width="10" height="10" viewBox="0 0 16 16" fill="none">
+              <path d="M2 8h12M10 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Déplacer
+          </button>
+        )}
+      </div>
+
       {task.description && (
         <p className="text-[11px] text-gray-400 mb-2 leading-relaxed line-clamp-2">{task.description}</p>
       )}
 
-      {/* Labels */}
       {labels.length > 0 && (
         <div className="flex flex-wrap gap-1 mb-2">
           {labels.map(l => (
