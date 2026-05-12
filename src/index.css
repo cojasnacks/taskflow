@@ -10,6 +10,8 @@
   body {
     @apply bg-gray-50 text-gray-900 font-sans;
     -webkit-font-smoothing: antialiased;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
   }
 
   input, select, textarea {
@@ -45,7 +47,7 @@
 ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 2px; }
 ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
 
-/* DnD ghost */
-.dnd-ghost {
-  opacity: 0.4;
-}
+/* PWA iPhone */
+html { overscroll-behavior: none; }
+button { min-height: 36px; }
+.overflow-y-auto { -webkit-overflow-scrolling: touch; }

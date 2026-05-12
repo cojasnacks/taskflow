@@ -1,7 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useLabels } from '../../hooks/useLabels'
 import { supabase } from '../../lib/supabase'
-import { useEffect } from 'react'
 
 const STATUSES = [
   { value: 'todo', label: 'À faire' },
@@ -85,9 +84,9 @@ export default function TaskModal({ projects, task = null, defaultStatus = 'todo
   }
 
   return (
-    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50"
+    <div className="fixed inset-0 bg-black/30 flex sm:items-center items-end justify-center z-50"
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="bg-white rounded-2xl shadow-xl p-6 w-[440px] border border-gray-100 max-h-[90vh] overflow-y-auto">
+      <div className="bg-white sm:rounded-2xl rounded-t-2xl shadow-xl p-5 sm:w-[440px] w-full border border-gray-100 max-h-[90vh] overflow-y-auto">
         <h2 className="text-sm font-semibold text-gray-900 mb-4">{task ? 'Modifier la tâche' : 'Nouvelle tâche'}</h2>
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
@@ -134,7 +133,6 @@ export default function TaskModal({ projects, task = null, defaultStatus = 'todo
             <input name="due_date" type="date" value={form.due_date} onChange={handleChange} className="input" />
           </div>
 
-          {/* Labels globaux */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="block text-xs text-gray-500">Catégories</label>
@@ -166,7 +164,7 @@ export default function TaskModal({ projects, task = null, defaultStatus = 'todo
                   {l.name}
                 </button>
               ))}
-              {labels.length === 0 && <p className="text-xs text-gray-400">Aucune catégorie — crée-en une ci-dessus</p>}
+              {labels.length === 0 && <p className="text-xs text-gray-400">Aucune catégorie</p>}
             </div>
           </div>
 
