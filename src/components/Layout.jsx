@@ -26,11 +26,9 @@ export default function Layout() {
     ? profile.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
     : '??'
 
-  const navItems = [
+ const navItems = [
     { to: '/', end: true, icon: <IconStats />, label: 'Dashboard' },
-    { to: '/kanban', icon: <IconKanban />, label: 'Kanban' },
-    { to: '/list', icon: <IconList />, label: 'Liste' },
-    { to: '/settings', icon: <IconSettings />, label: 'Équipe' },
+    { to: '/kanban', icon: <IconKanban />, label: 'Overview' },
   ]
 
   const SidebarContent = () => (
