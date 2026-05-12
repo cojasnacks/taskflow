@@ -82,8 +82,9 @@ export default function KanbanPage() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <header className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 bg-white shrink-0">
-        <h1 className="text-sm font-semibold text-gray-900">Kanban</h1>
-        <button onClick={() => openCreate('todo')} className="btn btn-primary text-xs">+ Tâche</button>
+<h1 className="text-sm font-semibold text-gray-900">
+  {projectFilter ? projects.find(p => p.id === projectFilter)?.name || 'Overview' : 'Overview'}
+</h1>        <button onClick={() => openCreate('todo')} className="btn btn-primary text-xs">+ Tâche</button>
       </header>
 
       <div className="flex-1 overflow-hidden">
