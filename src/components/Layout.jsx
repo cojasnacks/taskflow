@@ -5,6 +5,7 @@ import { useProjects } from '../hooks/useProjects'
 import { useNotifications } from '../hooks/useNotifications'
 import NewProjectModal from './shared/NewProjectModal'
 import NotificationsPanel from './shared/NotificationsPanel'
+import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
 
 const PROJECT_COLORS = ['#5344B7','#1D9E75','#BA7517','#D85A30','#D4537E','#378ADD']
 
@@ -13,6 +14,7 @@ export default function Layout() {
   const { projects, createProject } = useProjects()
   const { unreadCount } = useNotifications()
   const navigate = useNavigate()
+const location = useLocation()
   const [showNewProject, setShowNewProject] = useState(false)
   const [showNotifs, setShowNotifs] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -68,14 +70,17 @@ export default function Layout() {
             <span className="text-[10px] font-medium text-gray-400 uppercase tracking-widest">Projets</span>
             <button onClick={() => setShowNewProject(true)} className="text-gray-400 hover:text-gray-600 text-sm leading-none">+</button>
           </div>
-          {projects.map(p => (
-            <NavLink key={p.id} to={`/kanban?project=${p.id}`}
-              onClick={() => setSidebarOpen(false)}
-              className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors">
-              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: p.color }} />
-              <span className="truncate">{p.name}</span>
-            </NavLink>
-          ))}
+        {projects.map(p => {
+  const isActive = location.search.includes(p.id)
+  return (
+    <NavLink key={p.id} to={`/kanban?project=${p.id}`}
+      onClick={() => setSidebarOpen(false)}
+      className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-sm transition-colors ${isActive ? 'bg-accent-light text-accent font-medium' : 'text-gray-600 hover:bg-gray-50'}`}>
+      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: p.color }} />
+      <span className="truncate">{p.name}</span>
+    </NavLink>
+  )
+})}
           {projects.length === 0 && <p className="px-2.5 text-xs text-gray-400 py-1">Aucun projet</p>}
         </div>
       </nav>
